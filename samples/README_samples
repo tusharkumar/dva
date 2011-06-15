@@ -1,0 +1,93 @@
+This is a tutorial on how to run the analysis.
+We will demonstrate using some applications from the MediaBench II video suite.
+
+Steps
+1. Under dva/samples, download and unpack the benchmark source:
+       wget http://euler.slu.edu/~fritts/mediabench/mb2/mb2_video.tgz
+       tar xvzf mb2_video.tgz
+
+  This should create the dva/samples/mediabench2_video directory.
+
+2. Under mediabench2_video/mpeg2enc, unpack the source code for
+    the mpeg2enc and the mpeg2dec applications.
+
+       cd mediabench2_video/mpeg2enc
+       tar xvzf mpeg2vidcodec_v12.tar.gz
+
+   This should create the mpeg2/src/mpeg2enc and mpeg2/src/mpeg2dec directories
+    for the two applications.
+
+3. Profile instrumenting mpeg2dec:
+     First make sure that the 'bin' directory containing llvm-gcc
+        and the 'bin' directory under llvm's install-path are in PATH.
+
+  a) cd mpeg2/src/mpeg2dec
+  b) mv Makefile Makefile.original
+  c) cp ../../../../../mpeg2dec_Makefile Makefile
+  d) Edit Makefile to set the LLVM_SRC_PATH variable correctly
+  e) make
+
+   You should now have the following files:
+      - mpeg2decode: the instrumented binary
+      - func_map.dump, func_loop_hier.dump: static analysis info extracted
+           during profile-instrumentation
+
+4. Getting large test-inputs:
+  a) Download 'dolbycity.zip' from http://www.dvdloc8.com/dolbydtsclip.php?clipid=2
+  b) Extract dolbycity.vob from zip-file
+  c) Use transcode.pl utility (under dva/samples) to produce video in MPEG2 format.
+     (you'll need ffmpeg installed, edit transcode.pl to correct path to ffmpeg)
+
+       transcode.pl dolbycity.vob
+
+  d) Copy the produced dolbycity160x120.m2v file to dva/samples/run_mpeg2dec
+
+5. Running mpeg2dec
+     Under dva/samples/run_mpeg2dec, invoke script to run mpeg2dec on the test input.
+
+       sh run.sh
+
+    The following files are produced:
+      - rec0.ppm to rec549.ppm: the raw-image frame-sequence decoded from the video
+      - profile.dump and profile.dump.1: profile data on which DVA analysis will run
+
+6. DVA analysis of mpeg2dec
+    Under dva/samples/run_mpeg2dec, carry out following steps
+   a) copy func_map.dump and func_loop_hier.dump from ../mediabench2_video/mpeg2enc/mpeg2/src/mpeg2dec/
+   b) Invoke the DVA script (bash format)
+         python ../../analysis/vtpanalysis.py 2>&1 > log01
+
+    This will produce following files:
+       - taskcet.dot: Graphviz format of an intermediate program representation
+           called the Call-Context-Tree (CCT)
+       - extracted_trees.txt: An intermediate result for the analysis, that allows
+           DVA to be re-invoked repeatedly on the profile-data with low overhead.
+       - maincc.txt: Call-Context-Sets for the top-level VCG patterns
+             (refer to documentation on the analysis, see dva/README)
+       - vcg.txt: DVA results in VCG form
+
+    NOTE: The vtpanalysis.py script can run for hours before producing the
+     extracted_trees.txt file. However, if the analysis were to be repeated
+     for different values of the DVA configuration parameters, a previously
+      generated extracted_trees.txt allows the analysis to be re-run in less
+      than a second.
+
+     Example:
+         python ../../analysis/vtpanalysis.py  extracted_trees.txt cost_limit=0.3 vim_cutoff_fraction=0.1 2>&1 > log02
+
+     Refer to usage instructions produced by vtpanalysis.py, and to the documentation.
+
+7. Running analysis for the mpeg2enc application.
+     This is identical to the above steps for mpeg2dec.
+   a) Follow Step 3) above to copy mpeg2enc_Makefile to mediabench2_video/mpeg2enc/mpeg2/src/mpeg2enc,
+          and build application.
+
+   b) Under dva/samples/run_mpeg2enc, execute application
+         sh run.sh
+
+     NOTE: you should have previously executed mpeg2dec to produce the rec0.ppm - rec549.ppm files
+         under samples/run_mpeg2dec. These now becomes the input data for the mpeg2enc application.
+
+   c) Follow Step 6) to copy func_map.dump and func_loop_hier.dump from mpeg2/src/mpeg2enc,
+          and then invoke DVA.
+        

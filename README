@@ -1,0 +1,92 @@
+// Copyright 2011, Tushar Kumar, Georgia Institute of Technology, under the 3-clause BSD license
+//
+// Author: Tushar Kumar, tushardeveloper@gmail.com
+
+Dominant Variance Analysis
+--------------------------
+
+1. INTRODUCTION
+Dominant Variance Analysis (DVA) is a new profile analysis technique that extracts
+out the common/recurrent/dominant patterns of behavior of an application.
+It is pertinent to applications with complex control-flow behavior that
+is fairly sensitive data-sets. DVA summarizes the dynamic call-graph behavior
+of a large, complex application in just a handful of patterns.
+
+DVA makes the following types of application characterizations easy:
+ a) Reveal parts of application behavior that are sensitive to variations in data
+
+ b) Determine what parts of an interactive/streaming application are susceptible to
+    jitter, or may be relevant for defining the soft-real-time execution properties of
+    the application.
+
+ c) See the principal data-set independent structure of the application.
+    Often such a structure closely resembles the high-level or functional
+    design of the application. Large number of functions are omitted if they
+    are determined irrelevant with regards to influencing behavior. The final
+    results are represented as simple structures involving just a few functions,
+    where the behavior of the same function is differentiated based on its
+    differing behavior under differing call-contexts.
+
+ d) See data-set specific variations of behavior.
+
+Please refer to [1] for a description of the VCG representation used by DVA to
+produce the results.
+
+
+2. CONTENTS
+     dva/
+       analysis/    - Python code for the DVA analysis.
+                          Works off a profile representation.
+
+       prof_instr/  - Profile instrumentation compiler pass for LLVM,
+                          so application produces a profile when executed.
+
+       samples/     - Tutorial on how to profile-instrument applications
+                          and how to apply DVA analysis.
+
+
+3. BUILDING
+ - The analysis is written in python, and does not need to be compiled.
+
+ - However, the application needs to be profile-instrumented by a compiler
+   in order to produce profile events that the DVA can analyze.
+
+ - There are multiple ways in which the profile-instrumentation can be done,
+   as explored in [1]. In this distribution, we provide one method for
+   convenience, in the form of an LLVM compiler pass for C/C++ applications.
+
+  STEPS for building Profile-Instrumentation:
+   a) First install the LLVM 2.9 compiler infrastructure. This can be
+      done in a local user directory.
+
+        http://llvm.org
+
+   b) Let LLVM_SRC_DIR represent the directory containing the LLVM 2.9
+       source code.
+      Copy the dva/prof_instr/DVA_ProfileInstrument directory to
+         LLVM_SRC_DIR/lib/Transform.
+
+   c) Under LLVM_SRC_DIR/lib/Transform/DVA_ProfileInstrument:
+       type 'make' to build the profile-instrumentation pass.
+
+    NOTE: PATH should include the 'bin' directories for both
+          the LLVM install-directory, and the llvm-gcc directory.
+          LLVM installation instructions cover this.
+     
+
+4. Applying Dominant Variance Analysis to Applications
+  - The Makefile of an application must be modified to use
+     llvm-gcc instead of gcc, and to apply the profile-instrumentation.
+
+   For a simple illustration of compiling using llvm-gcc, see
+
+      http://llvm.org/releases/2.9/docs/GettingStarted.html#tutorial
+
+  - Please refer to dva/samples/README_samples for an illustration
+     of applying DVA to the mpeg2dec and mpeg2enc applications from
+     the MediaBench II video suite.
+
+
+[1] Kumar, T. and Pande, S., “Dominant variance characterization,” in Georgia Tech
+    CERCS Tech Report GIT-CERCS-10-07, July 2010.
+     
