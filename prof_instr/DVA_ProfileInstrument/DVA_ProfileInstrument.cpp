@@ -249,7 +249,7 @@ namespace {
 		}
 
 		bool isSpecial_PROFILE_function(const std::string& func_name) {
-			if(func_name == "PROFILE_open" || func_name == "PROFILE_dump_setting"
+			if(func_name == "PROFILE_select_threadid" || func_name == "PROFILE_open" || func_name == "PROFILE_dump_setting"
 				|| func_name == "PROFILE_function_entry" || func_name == "PROFILE_function_exit"
 				|| func_name == "PROFILE_exception"
 				|| func_name == "PROFILE_identifier" || func_name == "PROFILE_request_next_identifier"

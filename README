@@ -86,6 +86,40 @@ produce the results.
      of applying DVA to the mpeg2dec and mpeg2enc applications from
      the MediaBench II video suite.
 
+5. Profiling multi-threaded applications
+  - DVA is currently limited to profiling a single thread of the application.
+    The user must explicitly identify a thread to profile before enabling profile dumping.
+    (Note: explicit identification is not required if the application is not multi-threaded).
+
+  - Recommended steps:
+     + Add the following declarations to the application code.
+
+		#include <pthread.h>
+		void PROFILE_select_threadid(pid_t threadid);
+		void PROFILE_dump_setting(int true_of_false);
+
+	+ At the beginining of main() disable all profiling.
+
+		PROFILE_dump_setting(0);
+
+	+ When the thread to be profiled has been created, determine its
+	  threadid and pass to the profiler.
+
+		PROFILE_select_threadid(my_threadid);
+
+		NOTE: The threadid can be determined from either the thread-handle
+              or from inside the selected thread as follows.
+
+				pid_t my_threadid = syscall(SYS_gettid);
+
+	+ Enable profiling from inside the top-level thread-function
+	  in the thread with threadid = my_threadid. After this step
+	  do not attempt to change the selected threadid.
+
+		PROFILE_dump_setting(1);
+
+
+
 
 [1] Kumar, T. and Pande, S., “Dominant variance characterization,” in Georgia Tech
     CERCS Tech Report GIT-CERCS-10-07, July 2010.

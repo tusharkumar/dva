@@ -4,6 +4,26 @@ extern "C" {
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+
+// Limitation: In a multi-threaded application only one thread must generate profile events.
+// The chosen application thread must register its threadid using PROFILE_select_threadid().
+// If a threadid has been selected, the various profile dumping routines will query their
+// threadid and dump only if found to match the selected threadid.
+
+static int             is_threadid_selected = 0;
+static pid_t           selected_threadid; //defined iff is_threadid_selected == 1
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void PROFILE_select_threadid(pid_t threadid)
+{
+	pthread_mutex_lock(&mutex);
+	is_threadid_selected = 1;
+	selected_threadid = threadid;
+	pthread_mutex_unlock(&mutex);
+}
 
 static FILE * prof_fp = 0;
 static int fp_counter = 0;
@@ -17,6 +37,7 @@ static int dump_profile_setting = 0;
 
 static int request_next_identifier_flag = 0; //used for identifying functions called via function-pointers
 
+// Will be invoked only from other calls in a thread-safe manner
 void PROFILE_open() {
 	prof_fp = fopen("profile.dump", "w");
 	if(prof_fp == 0) {
@@ -42,10 +63,26 @@ void PROFILE_open() {
 	}                                                                                                                    \
 }
 
+// Assumption: is_threadid_selected and selected_threadid will not change once profile-dumping has been
+//   enabled (by the application invoking PROFILE_dump_setting(1)).
+//   Hence, only the selected thread can continue past this if-statement in all the API calls, thereby serializing the
+//   invocation of all the profile dump functionality. For this reason we don't need to create critical sections
+//   in the profile calls.
+#define GATE_THREAD                                                                                                      \
+{                                                                                                                        \
+	if(is_threadid_selected == 1) {                                                                                      \
+		pid_t my_threadid = syscall(SYS_gettid);                                                                         \
+		if(my_threadid != selected_threadid)                                                                             \
+			return;                                                                                                      \
+	}                                                                                                                    \
+}
+
 //true_of_false = 0 turns off profile dumping,
 //  o.w., turn on dumping of profile events
 void PROFILE_dump_setting(int true_of_false) {
+	pthread_mutex_lock(&mutex);
 	dump_profile_setting = true_of_false;
+	pthread_mutex_unlock(&mutex);
 }
 
 //PROFILE_function_entry(), PROFILE_function_exit(), PROFILE_exception()
@@ -73,6 +110,8 @@ void PROFILE_function_entry(
 	int loop_lexical_id
 )
 {
+	GATE_THREAD;
+
 	if(prof_fp == 0)
 		PROFILE_open();
 
@@ -94,6 +133,8 @@ void PROFILE_function_exit(
 	int loop_lexical_id
 )
 {
+	GATE_THREAD;
+
 	if(prof_fp == 0)
 		PROFILE_open();
 
@@ -115,6 +156,8 @@ void PROFILE_exception(
 	int loop_lexical_id
 )
 {
+	GATE_THREAD;
+
 	if(prof_fp == 0)
 		PROFILE_open();
 
@@ -133,6 +176,8 @@ void PROFILE_exception(
 //For handling function-pointers
 void PROFILE_identifier(int entered_func_id)
 {
+	GATE_THREAD;
+
 	if(prof_fp == 0)
 		PROFILE_open();
 
@@ -153,7 +198,11 @@ void PROFILE_identifier(int entered_func_id)
 }
 
 void PROFILE_request_next_identifier()
-{ request_next_identifier_flag = 1; }
+{
+	GATE_THREAD;
+
+	request_next_identifier_flag = 1;
+}
 
 #ifdef __cplusplus
 } //extern "C"
