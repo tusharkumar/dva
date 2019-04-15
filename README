@@ -9,7 +9,7 @@ Dominant Variance Analysis
 Dominant Variance Analysis (DVA) is a new profile analysis technique that extracts
 out the common/recurrent/dominant patterns of behavior of an application.
 It is pertinent to applications with complex control-flow behavior that
-is fairly sensitive data-sets. DVA summarizes the dynamic call-graph behavior
+is fairly sensitive to the data-set. DVA summarizes the dynamic call-graph behavior
 of a large, complex application in just a handful of patterns.
 
 DVA makes the following types of application characterizations easy:
@@ -29,8 +29,8 @@ DVA makes the following types of application characterizations easy:
 
  d) See data-set specific variations of behavior.
 
-Please refer to [1] for a description of the VCG representation used by DVA to
-produce the results.
+Please refer to [1] for the main concepts underlying DVA and a description of the
+VCG representation used by DVA to present the results.
 
 
 2. CONTENTS
@@ -52,16 +52,18 @@ produce the results.
    in order to produce profile events that the DVA can analyze.
 
  - There are multiple ways in which the profile-instrumentation can be done,
-   as explored in [1]. In this distribution, we provide one method for
+   as explored in [2]. In this distribution, we provide one method for
    convenience, in the form of an LLVM compiler pass for C/C++ applications.
 
   STEPS for building Profile-Instrumentation:
-   a) First install the LLVM 2.9 compiler infrastructure. This can be
+   a) First install the LLVM compiler infrastructure. This can be
       done in a local user directory.
 
         http://llvm.org
 
-   b) Let LLVM_SRC_DIR represent the directory containing the LLVM 2.9
+    TODO: Update with instructions for recent LLVM versions.
+
+   b) Let LLVM_SRC_DIR represent the directory containing the LLVM
        source code.
       Copy the dva/prof_instr/DVA_ProfileInstrument directory to
          LLVM_SRC_DIR/lib/Transform.
@@ -121,6 +123,9 @@ produce the results.
 
 
 
-[1] Kumar, T. and Pande, S., “Dominant variance characterization,” in Georgia Tech
+[1] Tushar Kumar, Kangqi Ni, and Santosh Pande,
+"Characterizing Dominant Program Behavior Using the Execution-Time Variance of the Call Structure",
+in RTAS 2019
+
+[2] Kumar, T. and Pande, S., “Dominant variance characterization,” in Georgia Tech
     CERCS Tech Report GIT-CERCS-10-07, July 2010.
-     
