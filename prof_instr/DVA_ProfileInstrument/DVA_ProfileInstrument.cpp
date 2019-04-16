@@ -4,14 +4,14 @@
 
 
 #include "llvm/Pass.h"
-#include "llvm/Module.h"
-#include "llvm/Function.h"
-#include "llvm/GlobalVariable.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Constants.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/InstrTypes.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Analysis/LoopInfo.h"
 
 #include <string>
@@ -50,29 +50,29 @@ namespace {
 			dyn_instr_count_global = new GlobalVariable(M, Type::getInt64Ty(M.getContext()), false, GlobalValue::ExternalLinkage, 0, "dyn_instr_count");
 			
 			//Insert declarations for PROFILE functions
-			std::vector<const Type *> type_3int_params;
+			std::vector<Type *> type_3int_params;
 			type_3int_params.push_back(Type::getInt32Ty(M.getContext()));
 			type_3int_params.push_back(Type::getInt32Ty(M.getContext()));
 			type_3int_params.push_back(Type::getInt32Ty(M.getContext()));
 
-			FunctionType * func_type_3ints = FunctionType::get(Type::getVoidTy(M.getContext()), type_3int_params, false);
+			FunctionType * func_type_3ints = FunctionType::get(Type::getVoidTy(M.getContext()), ArrayRef<Type *>(type_3int_params), false);
 
 			PROFILE_function_entry = Function::Create(func_type_3ints, GlobalValue::ExternalLinkage, "PROFILE_function_entry", &M);
 			PROFILE_function_exit = Function::Create(func_type_3ints, GlobalValue::ExternalLinkage, "PROFILE_function_exit", &M);
 			PROFILE_exception = Function::Create(func_type_3ints, GlobalValue::ExternalLinkage, "PROFILE_exception", &M);
 
 
-			std::vector<const Type *> type_params_1int;
+			std::vector<Type *> type_params_1int;
 			type_params_1int.push_back(Type::getInt32Ty(M.getContext()));
 
-			FunctionType * func_type_1int = FunctionType::get(Type::getVoidTy(M.getContext()), type_params_1int, false);
+			FunctionType * func_type_1int = FunctionType::get(Type::getVoidTy(M.getContext()), ArrayRef<Type *>(type_params_1int), false);
 
 			PROFILE_dump_setting = Function::Create(func_type_1int, GlobalValue::ExternalLinkage, "PROFILE_dump_setting", &M);
 			PROFILE_identifier = Function::Create(func_type_1int, GlobalValue::ExternalLinkage, "PROFILE_identifier", &M);
 
-			std::vector<const Type *> type_params_0int;
+			std::vector<Type *> type_params_0int;
 
-			FunctionType * func_type_0int = FunctionType::get(Type::getVoidTy(M.getContext()), type_params_0int, false);
+			FunctionType * func_type_0int = FunctionType::get(Type::getVoidTy(M.getContext()), ArrayRef<Type *>(type_params_0int), false);
 
 			PROFILE_request_next_identifier = Function::Create(func_type_0int, GlobalValue::ExternalLinkage, "PROFILE_request_next_identifier", &M);
 
@@ -91,7 +91,7 @@ namespace {
 
 		virtual void getAnalysisUsage(AnalysisUsage &AU) const {
 			AU.addRequired<DVAModuleSetup>();
-			AU.addRequired<LoopInfo>();
+			AU.addRequired<LoopInfoWrapperPass>();
 		}
 
 		virtual bool runOnFunction(Function &F) {
@@ -121,7 +121,7 @@ namespace {
 
 
 
-			LoopInfo &LI = getAnalysis<LoopInfo>();
+			LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
 			LI.print(errs()); //std::cerr);
 
 			std::vector<Loop *> vLoops;
@@ -165,15 +165,15 @@ namespace {
 						add_func_name_to_map(invoked_func_name);
 
 						//add instr_count to dyn_instr_count_global, set instr_count = 0
-						update_dyn_instr_count(instr_count, i);
+						update_dyn_instr_count(instr_count, invokeInst);
 						instr_count = 0;
 
 						int invoked_func_id = map_func_name_to_id[invoked_func_name];
 
 						//insert profile-function-entry call before call-site
-						insert_profile_function_entry_call(invoked_func_id, function_lex_count, loop_lexical_id, i);
+						insert_profile_function_entry_call(invoked_func_id, function_lex_count, loop_lexical_id, invokeInst);
 						if(invoked_func_name == "NULL_FUNC")
-							insert_profile_request_next_identifier(i); //need function called via function-pointer to identify itself
+							insert_profile_request_next_identifier(invokeInst); //need function called via function-pointer to identify itself
 
 						//insert basic-block containing profile-function-exit call on normal path
 						BasicBlock * orig_normalDestBB = invokeInst->getNormalDest(); //dest when invoked-function returns normally
@@ -207,30 +207,30 @@ namespace {
 						add_func_name_to_map(called_func_name);
 
 						//add instr_count to dyn_instr_count_global, set instr_count = 0
-						update_dyn_instr_count(instr_count, i);
+						update_dyn_instr_count(instr_count, callInst);
 						instr_count = 0;
 
 						int called_func_id = map_func_name_to_id[called_func_name];
 
 						//insert profile-function-entry call before call-site
-						insert_profile_function_entry_call(called_func_id, function_lex_count, loop_lexical_id, i);
+						insert_profile_function_entry_call(called_func_id, function_lex_count, loop_lexical_id, callInst);
 						if(called_func_name == "NULL_FUNC")
-							insert_profile_request_next_identifier(i); //need function called via function-pointer to identify itself
+							insert_profile_request_next_identifier(callInst); //need function called via function-pointer to identify itself
 
 						i++; //move to instruction just past call-site
 
 						//insert profile-function-exit call after call-site
-						insert_profile_function_exit_call(called_func_id, function_lex_count, loop_lexical_id, i);
+						insert_profile_function_exit_call(called_func_id, function_lex_count, loop_lexical_id, dyn_cast<Instruction>(i));
 
 						i--; //move up to the just inserted profile-exit-call, since loop-control increments
 
 						function_lex_count++;
 					}
 
-					else if(TerminatorInst * termInst = dyn_cast<TerminatorInst>(i)) {
-						update_dyn_instr_count(instr_count, i);
-						instr_count = 0;
-					}
+					// else if(TerminatorInst * termInst = dyn_cast<TerminatorInst>(i)) {
+					// 	update_dyn_instr_count(instr_count, termInst);
+					// 	instr_count = 0;
+					// }
 
 					instr_count++;
 				}
@@ -240,7 +240,7 @@ namespace {
 			BasicBlock * entry = &(F.getEntryBlock());
 			std::vector<Value*> Params;
 			Params.push_back(ConstantInt::get(Type::getInt32Ty(F.getContext()), curr_func_id)); //turn on
-			CallInst * prof_identifier = CallInst::Create(PROFILE_identifier, Params.begin(), Params.end(), "", entry->begin());
+			CallInst * prof_identifier = CallInst::Create(PROFILE_identifier, ArrayRef<Value *>(Params), "", dyn_cast<Instruction>(entry->begin()));
 
 			if(curr_func_name == "main")
 				create_profile_dumping_scope(F);
@@ -274,7 +274,7 @@ namespace {
 			Params.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), function_lex_count));
 			Params.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), loop_lexical_id));
 
-			CallInst * prof_func_entry = CallInst::Create(PROFILE_function_entry, Params.begin(), Params.end(), "", i);
+			CallInst * prof_func_entry = CallInst::Create(PROFILE_function_entry, ArrayRef<Value *>(Params), "", i);
 			return prof_func_entry;
 		}
 
@@ -284,7 +284,7 @@ namespace {
 			Params2.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), function_lex_count));
 			Params2.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), loop_lexical_id));
 
-			CallInst * prof_func_exit = CallInst::Create(PROFILE_function_exit, Params2.begin(), Params2.end(), "", i);
+			CallInst * prof_func_exit = CallInst::Create(PROFILE_function_exit, ArrayRef<Value *>(Params2), "", i);
 			return prof_func_exit;
 		}
 
@@ -294,14 +294,14 @@ namespace {
 			Params.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), function_lex_count));
 			Params.push_back(ConstantInt::get(Type::getInt32Ty(i->getContext()), loop_lexical_id));
 
-			CallInst * prof_exception = CallInst::Create(PROFILE_exception, Params.begin(), Params.end(), "", i);
+			CallInst * prof_exception = CallInst::Create(PROFILE_exception, ArrayRef<Value *>(Params), "", i);
 			return prof_exception;
 		}
 
 		CallInst * insert_profile_request_next_identifier(Instruction * i) {
 			std::vector<Value*> Params;
 
-			CallInst * prof_request_next_id = CallInst::Create(PROFILE_request_next_identifier, Params.begin(), Params.end(), "", i);
+			CallInst * prof_request_next_id = CallInst::Create(PROFILE_request_next_identifier, ArrayRef<Value *>(Params), "", i);
 			return prof_request_next_id;
 		}
 
@@ -309,7 +309,7 @@ namespace {
 			BasicBlock * entry = &(F.getEntryBlock());
 			std::vector<Value*> Params_ON;
 			Params_ON.push_back(ConstantInt::get(Type::getInt32Ty(F.getContext()), 1)); //turn on
-			CallInst * prof_dump_setting_ON = CallInst::Create(PROFILE_dump_setting, Params_ON.begin(), Params_ON.end(), "", entry->begin());
+			CallInst * prof_dump_setting_ON = CallInst::Create(PROFILE_dump_setting, ArrayRef<Value *>(Params_ON), "", dyn_cast<Instruction>(entry->begin()));
 
 
 			std::vector<Value*> Params_OFF;
@@ -319,7 +319,7 @@ namespace {
 				//for each instruction in basic-block
 				for(BasicBlock::iterator i=b->begin(), ie=b->end(); i != ie; i++) {
 					if(ReturnInst * retInst = dyn_cast<ReturnInst>(i)) {
-						CallInst * prof_dump_setting_OFF = CallInst::Create(PROFILE_dump_setting, Params_OFF.begin(), Params_OFF.end(), "", retInst);
+						CallInst * prof_dump_setting_OFF = CallInst::Create(PROFILE_dump_setting, ArrayRef<Value *>(Params_OFF), "", retInst);
 					}
 				}
 			}
